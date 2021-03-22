@@ -12,9 +12,9 @@ const users = [];
 function checksExistsUserAccount(request, response, next) {
   const { username } = request.headers;
 
-  const userAlreadyExists = users.find((user) => user.username === username);
+  const user = users.find((user) => user.username === username);
 
-  if (userAlreadyExists) {
+  if (user) {
     request.user = user;
 
     return next();
@@ -26,31 +26,56 @@ function checksExistsUserAccount(request, response, next) {
 function checksCreateTodosUserAvailability(request, response, next) {
   const { user } = request;
 
-  const userTodosQuantity = user.todos.lenght;
+  const userTodosQuantity = user.todos.length;
 
-  if (userTodosQuantity <= 10 || user.pro) {
+  if ((!user.pro && userTodosQuantity < 10) || user.pro) {
     return next();
   }
 
-  return response.status(401).json({ error: "User must have a PRO account!" });
+  return response.status(403).json({
+    error: "User must have a PRO account or have less then 10 todos!",
+  });
 }
 
 function checksTodoExists(request, response, next) {
-  const { requestUser } = request.user;
+  const { username } = request.headers;
 
   const { id } = request.params;
 
-  checksExistsUserAccount();
+  const userAlreadyExists = users.find((user) => user.username === username);
 
-  const todoBelongsThisUser = users.find(user => user.todos === id)
-
-  if (validate(id) && todoBelongsThisUser) {
-    request.todo = todoBelongsThisUser;
+  if (!userAlreadyExists) {
+    return response.status(404).json({ error: "User not exist!" });
   }
+
+  if (!validate(id)) {
+    return response.status(400).json({ error: "Id is not a valid UUID!" });
+  }
+
+  const findTodo = userAlreadyExists.todos.find((todo) => todo.id === id);
+
+  if (!findTodo) {
+    return response.status(404).json({ error: "Todo not found" });
+  }
+
+  request.todo = findTodo;
+
+  request.user = userAlreadyExists;
+
+  return next();
 }
 
 function findUserById(request, response, next) {
-  // Complete aqui
+  const { id } = request.params;
+
+  const user = users.find((user) => user.id === id);
+
+  if (!user) {
+    return response.status(404).json({ error: "User not found" });
+  }
+
+  request.user = user;
+  return next();
 }
 
 app.post("/users", (request, response) => {
